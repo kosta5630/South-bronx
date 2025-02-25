@@ -1,0 +1,309 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "v3x Hub",
+   LoadingTitle = "v3x on top",
+   ConfigurationSaving = {
+      Enabled = true,
+      FileName = "v3x_Hub_Config"
+   }
+})
+
+-- Create Tabs
+local AutoFarmTab = Window:CreateTab("AutoFarm", 4483362458)
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local MiscTab = Window:CreateTab("Miscellaneous", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+
+-- 🌾 Marshmallow Farm Automation (AutoFarm)
+local toggled = false
+local player = game.Players.LocalPlayer
+local backpack = player:FindFirstChild("Backpack")
+
+local function equipItem(itemName)
+    local item = backpack and backpack:FindFirstChild(itemName)
+    if item then
+        player.Character.Humanoid:EquipTool(item)
+    end
+end
+
+local function pressE()
+    local virtualInput = game:GetService("VirtualInputManager")
+    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
+    wait(0.1)
+    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+end
+
+local function startAutoFarm()
+    while toggled do
+        equipItem("Water")
+        pressE()
+        wait(23)
+
+        equipItem("Sugar Block Bag")
+        pressE()
+        wait(3)
+
+        equipItem("Gelatin")
+        pressE()
+        wait(45)
+
+        wait(5)
+        equipItem("Empty Bag")
+        pressE()
+
+        wait(1)
+    end
+end
+
+AutoFarmTab:CreateToggle({
+   Name = "Marshmallow Farm",
+   Default = false,
+   Callback = function(state)
+      toggled = state
+      if toggled then
+          startAutoFarm()
+      end
+   end
+})
+
+-- 🌐 CanCollide Tool (Settings)
+local mouse = player:GetMouse()
+local tool = Instance.new("Tool")
+tool.RequiresHandle = false
+tool.Name = "CanCollide Tool"
+
+local canCollideEnabled = false
+
+tool.Activated:Connect(function()
+    local target = mouse.Target
+    if target and target:IsA("BasePart") then
+        target.CanCollide = false
+    end
+end)
+
+SettingsTab:CreateToggle({
+   Name = "CanCollide Tool",
+   Default = false,
+   Callback = function(state)
+      canCollideEnabled = state
+      if canCollideEnabled then
+          -- Give the tool to the player's inventory
+          tool.Parent = player.Backpack
+      else
+          -- Remove the tool from the player's inventory
+          tool.Parent = nil
+      end
+   end
+})
+
+-- 🔄 Join Lowest Server (Miscellaneous)
+MiscTab:CreateButton({
+   Name = "Join Lowest Server",
+   Callback = function()
+      local HttpService = game:GetService("HttpService")
+      local placeId = game.PlaceId
+      local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+      
+      local success, data = pcall(function() 
+         return HttpService:JSONDecode(game:HttpGet(url))
+      end)
+      
+      if not success then
+         warn("Error getting servers: " .. tostring(data))
+         return
+      end
+      
+      local lowestServer = nil
+
+      for _, server in ipairs(data.data) do
+         if server.playing < 24 then
+            if not lowestServer or server.playing < lowestServer.playing then
+               lowestServer = server
+            end
+         end
+      end
+
+      if lowestServer then
+         local success, errorMessage = pcall(function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(placeId, lowestServer.id, game.Players.LocalPlayer)
+         end)
+         
+         if success then
+            print("Joining server with ID: " .. lowestServer.id)
+         else
+            warn("Error during teleportation: " .. errorMessage)
+         end
+      else
+         print("No available server with fewer than 24 players.")
+      end
+   end
+})
+
+-- ⏳ Anti-AFK Toggle (Miscellaneous)
+local antiAfkEnabled = false
+local function antiAFK()
+    local vu = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        if antiAfkEnabled then
+            vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+            wait(1)
+            vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        end
+    end)
+end
+
+MiscTab:CreateToggle({
+   Name = "Anti-AFK",
+   Default = false,
+   Callback = function(state)
+      antiAfkEnabled = state
+      if antiAfkEnabled then
+          antiAFK()
+      end
+   end
+})
+
+-- ⚡ Instant Interact (Miscellaneous)
+local instantInteractEnabled = false
+local function applyInstantInteract()
+    for _, prompt in pairs(game:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = 0
+            prompt.RequiresLineOfSight = false
+            prompt.MaxActivationDistance = 15
+        end
+    end
+end
+
+-- Listen for new ProximityPrompts being added
+game.DescendantAdded:Connect(function(obj)
+    if instantInteractEnabled and obj:IsA("ProximityPrompt") then
+        applyInstantInteract()
+    end
+end)
+
+MiscTab:CreateToggle({
+   Name = "Instant Interact",
+   Default = false,
+   Callback = function(state)
+      instantInteractEnabled = state
+      if instantInteractEnabled then
+          applyInstantInteract()
+      end
+   end
+})
+
+-- 🔄 Rejoin Server (Miscellaneous)
+MiscTab:CreateButton({
+   Name = "Rejoin Server",
+   Callback = function()
+      game:GetService("TeleportService"):Teleport(game.PlaceId, game.Players.LocalPlayer)
+   end
+})
+
+-- 🛡️ Anti-Mod (Settings)
+local antiModEnabled = false
+local modUserId = 90291944
+
+local function checkForMod()
+    while antiModEnabled do
+        for _, player in pairs(game.Players:GetPlayers()) do
+            if player.UserId == modUserId then
+                game.Players.LocalPlayer:Kick(" zCxsmic detected! Leaving the game...")
+                return
+            end
+        end
+        wait(5) -- Check every 5 seconds
+    end
+end
+
+SettingsTab:CreateToggle({
+   Name = "Anti-Mod",
+   Default = false,
+   Callback = function(state)
+      antiModEnabled = state
+      if antiModEnabled then
+          checkForMod()
+      end
+   end
+})
+
+-- 🔧 Lag Switch (Settings)
+local lagSwitchEnabled = false
+
+local function ToggleLagSwitch(value)
+    lagSwitchEnabled = value
+
+    if lagSwitchEnabled then
+        -- Set the physics update rate to very low (slower updates)
+        setfflag("S2PhysicsSenderRate", "0.1")
+
+        -- Disable network ownership for the player
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local humanoidRootPart = char.HumanoidRootPart
+            humanoidRootPart:SetNetworkOwner(nil)
+            humanoidRootPart.CanCollide = false
+            humanoidRootPart.Anchored = true
+        end
+    else
+        -- Restore normal physics update rate
+        setfflag("S2PhysicsSenderRate", "20")
+
+        -- Restore network ownership and enable collision
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local humanoidRootPart = char.HumanoidRootPart
+            humanoidRootPart:SetNetworkOwner(player)
+            humanoidRootPart.CanCollide = true
+            humanoidRootPart.Anchored = false
+        end
+    end
+end
+
+SettingsTab:CreateToggle({
+   Name = "Lag Switch",
+   Default = false,
+   Callback = function(state)
+      ToggleLagSwitch(state)
+   end
+})
+
+-- 💬 Remove Phone and Fist (Settings)
+local phoneAndFistRemoved = false
+local function removePhoneAndFist()
+    for _, item in pairs(player.Backpack:GetChildren()) do
+        if item.Name == "Phone" or item.Name == "Fist" then
+            item.Parent = nil
+        end
+    end
+end
+
+local function restorePhoneAndFist()
+    -- Assuming the phone and fist are stored somewhere (e.g. StarterPack)
+    local phone = game.ReplicatedStorage:FindFirstChild("Phone")
+    local fist = game.ReplicatedStorage:FindFirstChild("Fist")
+
+    if phone then
+        phone:Clone().Parent = player.Backpack
+    end
+
+    if fist then
+        fist:Clone().Parent = player.Backpack
+    end
+end
+
+SettingsTab:CreateToggle({
+   Name = "Remove Phone and Fist",
+   Default = false,
+   Callback = function(state)
+      phoneAndFistRemoved = state
+      if phoneAndFistRemoved then
+          removePhoneAndFist()
+      else
+          restorePhoneAndFist()
+      end
+   end
+})
